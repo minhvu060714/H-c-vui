@@ -1,141 +1,49 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-<meta charset="UTF-8">
-<title>Toán Lớp 3 Pro</title>
-<style>
-body{
-  font-family:Arial;
-  background:#e3f2fd;
-  text-align:center;
-}
-.box{
-  background:white;
-  max-width:400px;
-  margin:auto;
-  margin-top:20px;
-  padding:20px;
-  border-radius:20px;
-  box-shadow:0 5px 20px rgba(0,0,0,0.2);
-}
-h1{color:#1976D2}
-button{
-  padding:12px 20px;
-  font-size:16px;
-  border:none;
-  border-radius:12px;
-  margin:5px;
-  background:#4CAF50;
-  color:white;
-}
-button:active{transform:scale(0.95)}
-input{
-  font-size:20px;
-  width:100px;
-  text-align:center;
-}
-select{
-  font-size:16px;
-  padding:5px;
-}
-.star{font-size:24px}
-.timer{color:red;font-weight:bold}
-</style>
-</head>
-
-<body>
-<div class="box">
-<h1>🧮 Toán Lớp 3</h1>
-
-<select id="mode">
-  <option value="+">➕ Cộng</option>
-  <option value="-">➖ Trừ</option>
-  <option value="*">✖ Nhân</option>
-  <option value="/">➗ Chia</option>
-</select>
-
-<p id="question">Bấm BẮT ĐẦU</p>
-<p class="timer">⏱ <span id="time">10</span>s</p>
-
-<input type="number" id="answer"><br><br>
-
-<button onclick="check()">Trả lời</button>
-<button onclick="newQuestion()">Bắt đầu</button>
-
-<p id="result"></p>
-<p>⭐ Điểm: <span id="score">0</span></p>
-<p>🏆 Cấp độ: <span id="level">1</span></p>
-<p class="star" id="stars"></p>
-</div>
-
-<script>
-let a,b,op,score=0,level=1,time=10,timer;
-
-function speak(text){
-  let msg=new SpeechSynthesisUtterance(text);
-  msg.lang="vi-VN";
-  speechSynthesis.speak(msg);
-}
-
-function random(max){return Math.floor(Math.random()*max)+1;}
-
-function startTimer(){
-  clearInterval(timer);
-  time=10;
-  document.getElementById("time").innerText=time;
-  timer=setInterval(()=>{
-    time--;
-    document.getElementById("time").innerText=time;
-    if(time<=0){
-      clearInterval(timer);
-      document.getElementById("result").innerText="⏰ Hết giờ!";
-      speak("Hết giờ rồi");
+export default {
+  async fetch(req, env) {
+    if (req.method !== "POST") {
+      return new Response("OK");
     }
-  },1000);
+
+    const { level } = await req.json();
+
+    const prompt = `
+Bạn là chuyên gia phong thuỷ.
+Tạo 1 câu hỏi trắc nghiệm phong thuỷ.
+Mức độ: ${level}
+
+Yêu cầu:
+- 4 đáp án
+- 1 đáp án đúng
+- Giải thích ngắn gọn, dễ hiểu
+- Không mê tín cực đoan
+
+Trả về JSON đúng mẫu:
+{
+  "question": "",
+  "options": ["", "", "", ""],
+  "correct": 0,
+  "explain": ""
 }
+`;
 
-function newQuestion(){
-  let max=level*5;
-  a=random(max);
-  b=random(max);
-  op=document.getElementById("mode").value;
-  if(op=="/") a=a*b;
+    const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${env.OPENAI_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "gpt-4.1-mini",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7
+      })
+    });
 
-  let q=`${a} ${op} ${b} bằng bao nhiêu`;
-  document.getElementById("question").innerText="❓ "+q;
-  document.getElementById("answer").value="";
-  document.getElementById("result").innerText="";
-  speak(q);
-  startTimer();
-}
+    const data = await aiRes.json();
+    const content = data.choices[0].message.content;
 
-function check(){
-  clearInterval(timer);
-  let ans=Number(document.getElementById("answer").value);
-  let correct;
-
-  switch(op){
-    case "+":correct=a+b;break;
-    case "-":correct=a-b;break;
-    case "*":correct=a*b;break;
-    case "/":correct=a/b;break;
+    return new Response(content, {
+      headers: { "Content-Type": "application/json" }
+    });
   }
-
-  if(ans===correct){
-    score++;
-    document.getElementById("result").innerText="🎉 Chính xác!";
-    speak("Chính xác, rất giỏi");
-    if(score%5===0){level++;}
-  }else{
-    document.getElementById("result").innerText=
-      `❌ Sai rồi! Đáp án là ${correct}`;
-    speak("Sai rồi");
-  }
-
-  document.getElementById("score").innerText=score;
-  document.getElementById("level").innerText=level;
-  document.getElementById("stars").innerText="⭐".repeat(score%5);
-}
-</script>
-</body>
-</html>
+};
